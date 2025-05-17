@@ -1,0 +1,18 @@
+[project]
+name = "switchbot-ble-to-influxdb"
+version = "0.1.0"
+description = "Collects environmental data from SwitchBot BLE sensors and stores it in InfluxDB."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "influxdb-client>=1.48.0",
+    "pyswitchbot",
+    "python-dotenv>=1.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "just-bin>=1.40.0",
+    "pytest-cov>=6.1.1",
+    "pytest-asyncio>=0.26.0",
+]

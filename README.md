@@ -24,7 +24,7 @@ Development dependencies are managed via `pyproject.toml` and include `pytest` f
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
+    git clone https://github.com/junkei-okinawa/switchbot-ble-to-influxdb.git
     cd switchbot-ble-to-influxdb
     ```
 

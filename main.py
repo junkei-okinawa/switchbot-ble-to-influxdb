@@ -36,7 +36,7 @@ async def main():
     write_api = client.write_api(write_options=SYNCHRONOUS)
     logger.info("InfluxDB client initialized.")
 
-    sensors = await GetSwitchbotDevices().get_tempsensors()
+    sensors = await GetSwitchbotDevices().discover(scan_timeout=60)
     # logger.info(sensors)
     # logger.info(sensors['7688CA37-E4ED-E6F2-5D7A-B71CCE01D61D'])
     for address in sensors:

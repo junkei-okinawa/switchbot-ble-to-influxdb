@@ -2,6 +2,10 @@
 
 Collects environmental data from SwitchBot BLE sensors and stores it in InfluxDB.
 
+---
+
+:book: 日本語版READMEはこちら → [README_JA.md](./README_JA.md)
+
 ## Requirements
 
 *   Python 3.12+
@@ -63,6 +67,12 @@ uv run just dev
 This command will execute the `main.py` script, which discovers SwitchBot temperature sensors, reads data from the specified device, and writes it to your InfluxDB instance.
 
 Logs will be printed to the console.
+
+## Note on Raspberry Pi and scan_timeout
+
+On Raspberry Pi and some other environments, recognizing the UUID of SwitchBot devices may take longer than usual. For this reason, this project explicitly sets `scan_timeout=60` when discovering devices (see commit 9ff7bc47034d1407da9c100e67837f1ccae97936).
+
+If you experience timeouts with the default `get_tempsensors()`, please use `GetSwitchbotDevices().discover(scan_timeout=60)` instead.
 
 ## How it Works
 

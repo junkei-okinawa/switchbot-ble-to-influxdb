@@ -1,9 +1,7 @@
 // devcontainer.json
 {
   "name": "switchbot-ble-to-influxdb-dev",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  "image": "ghcr.io/jsburckhardt/devcontainer-features/uv:1",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}

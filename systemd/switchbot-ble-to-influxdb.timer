@@ -1,0 +1,13 @@
+[Unit]
+Description=Run switchbot-ble-to-influxdb every 10 minutes
+
+[Timer]
+# Equivalent to '*/10 * * * *' in cron.
+# This schedules the service to run at 0, 10, 20, 30, 40, 50 minutes past every hour.
+OnCalendar=*:00/10
+# Specifies the service unit that this timer will activate.
+Unit=switchbot-ble-to-influxdb.service
+
+[Install]
+# Specifies the target for enabling this timer in the user session.
+WantedBy=timers.target

@@ -1,17 +1,9 @@
 import os
 import sys
-
 import pytest
-from unittest.mock import patch, MagicMock
-import importlib
+from unittest.mock import patch, MagicMock, AsyncMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
-# `main` モジュールをインポートする前に、`asyncio.run` がパッチされていることを確認
-# これは、`main.py` の最下部にある `asyncio.run(main())` の呼び出しを避けるため
-# ただし、`if __name__ == "__main__":` ブロックで囲む方がより良い解決策
-with patch('asyncio.run', MagicMock()) as mock_run:
-    import main as reader_main
 
 @pytest.fixture
 def mock_env_vars(monkeypatch):
@@ -41,31 +33,22 @@ def mock_switchbot_devices():
     return {"test_address": mock_device}
 
 @pytest.mark.asyncio
-@patch('main.GetSwitchbotDevices')
-@patch('main.InfluxDBClient')
-async def test_environment_variables_present(MockInfluxDBClient, MockGetSwitchbotDevices, mock_env_vars, mock_switchbot_devices, caplog):
+async def test_environment_variables_present(mock_env_vars, mock_switchbot_devices, caplog):
     """環境変数がすべて設定されている場合のテスト"""
-    MockGetSwitchbotDevices.return_value.get_tempsensors.return_value = mock_switchbot_devices
-
-    # load_dotenv() が if __name__ == "__main__" ブロックに移動したため、
-    # テスト時には main.py のトップレベルでは .env は読み込まれない。
-    # monkeypatch で設定した環境変数がそのまま使われる。
-    importlib.reload(reader_main)
-    
-    # 環境変数が正しく設定されていることをデバッグ
-    print("Environment Variables:")
-    for key, _ in mock_env_vars.items():
-        print(f"{key}: {os.getenv(key)}")
-
-    try:
-        await reader_main.main() # main関数を呼び出し
-    except OSError: # EnvironmentError は OSError として扱われる
-        pytest.fail("OSError (EnvironmentError) was raised unexpectedly with all env vars set.")
-    except Exception as e:
-        pytest.fail(f"An unexpected exception occurred: {e}")
-
-    # ログ出力を検証 (オプション)
-    # assert "Data written to InfluxDB" in caplog.text
+    with patch('main.GetSwitchbotDevices') as MockGetSwitchbotDevices, \
+         patch('main.InfluxDBClient') as MockInfluxDBClient:
+        MockGetSwitchbotDevices.return_value.discover = AsyncMock(return_value=mock_switchbot_devices)
+        import main
+        # 環境変数が正しく設定されていることをデバッグ
+        print("Environment Variables:")
+        for key, _ in mock_env_vars.items():
+            print(f"{key}: {os.getenv(key)}")
+        try:
+            await main.main() # main関数を呼び出し
+        except OSError: # EnvironmentError は OSError として扱われる
+            pytest.fail("OSError (EnvironmentError) was raised unexpectedly with all env vars set.")
+        except Exception as e:
+            pytest.fail(f"An unexpected exception occurred: {e}")
 
 @pytest.mark.asyncio
 async def test_environment_variables_missing_url(monkeypatch):
@@ -77,8 +60,8 @@ async def test_environment_variables_missing_url(monkeypatch):
     monkeypatch.delenv("INFLUXDB_URL", raising=False) # 明示的に削除
 
     with pytest.raises(OSError) as excinfo:
-        importlib.reload(reader_main)
-        await reader_main.main()
+        import main
+        await main.main()
     assert "Missing InfluxDB environment variables." in str(excinfo.value)
 
 @pytest.mark.asyncio
@@ -91,8 +74,8 @@ async def test_environment_variables_missing_token(monkeypatch):
     monkeypatch.delenv("INFLUXDB_TOKEN", raising=False) # 明示的に削除
 
     with pytest.raises(OSError) as excinfo:
-        importlib.reload(reader_main)
-        await reader_main.main()
+        import main
+        await main.main()
     assert "Missing InfluxDB environment variables." in str(excinfo.value)
 
 @pytest.mark.asyncio
@@ -105,7 +88,7 @@ async def test_environment_variables_missing_measurement(monkeypatch):
     monkeypatch.delenv("INFLUXDB_MEASUREMENT", raising=False) # 明示的に削除
 
     with pytest.raises(OSError) as excinfo:
-        importlib.reload(reader_main)
-        await reader_main.main()
+        import main
+        await main.main()
     assert "Missing InfluxDB environment variables." in str(excinfo.value)
 

@@ -46,9 +46,9 @@ async def test_successful_data_fetch_and_write(monkeypatch): # Added monkeypatch
         )
     }
 
-    # Mock GetSwitchbotDevices and its methods
+    # Mock GetSwitchbotDevices and its discover method
     mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.get_tempsensors.return_value = mock_sensor_data
+    mock_get_switchbot_devices.discover.return_value = mock_sensor_data
 
     # Mock InfluxDBClient and its methods
     mock_influx_client_instance = MagicMock()
@@ -63,7 +63,7 @@ async def test_successful_data_fetch_and_write(monkeypatch): # Added monkeypatch
 
         # Assertions
         mock_switchbot.assert_called_once()
-        mock_get_switchbot_devices.get_tempsensors.assert_awaited_once()
+        mock_get_switchbot_devices.discover.assert_awaited_once()
 
         mock_influx_client.assert_called_once_with(url="http://localhost:8086", token="test_token")
         mock_influx_client_instance.write_api.assert_called_once()
@@ -94,7 +94,7 @@ async def test_switchbot_device_not_found(monkeypatch): # Added monkeypatch here
     """
     # Mock GetSwitchbotDevices to return no sensors or an empty dict
     mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.get_tempsensors.return_value = {} # No sensors found
+    mock_get_switchbot_devices.discover.return_value = {} # No sensors found
 
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()
@@ -107,7 +107,7 @@ async def test_switchbot_device_not_found(monkeypatch): # Added monkeypatch here
         await reader_main_module.main() # Changed: Call main function from the module
 
         mock_switchbot.assert_called_once()
-        mock_get_switchbot_devices.get_tempsensors.assert_awaited_once()
+        mock_get_switchbot_devices.discover.assert_awaited_once()
         mock_influx_client.assert_called_once() # Client is still initialized
 
         # Ensure write was not called as no device data should be processed
@@ -138,7 +138,7 @@ async def test_influxdb_write_failure(monkeypatch): # Added monkeypatch here
     }
 
     mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.get_tempsensors.return_value = mock_sensor_data
+    mock_get_switchbot_devices.discover.return_value = mock_sensor_data
 
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()
@@ -153,7 +153,7 @@ async def test_influxdb_write_failure(monkeypatch): # Added monkeypatch here
         await reader_main_module.main() # Changed: Call main function from the module
 
         mock_switchbot.assert_called_once()
-        mock_get_switchbot_devices.get_tempsensors.assert_awaited_once()
+        mock_get_switchbot_devices.discover.assert_awaited_once()
         mock_influx_client.assert_called_once()
         mock_write_api.write.assert_called_once() # Write was attempted
 
@@ -177,7 +177,7 @@ async def test_specific_device_id_not_in_scan_results(monkeypatch): # Added monk
     }
 
     mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.get_tempsensors.return_value = mock_sensor_data
+    mock_get_switchbot_devices.discover.return_value = mock_sensor_data
 
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()
@@ -190,7 +190,7 @@ async def test_specific_device_id_not_in_scan_results(monkeypatch): # Added monk
         await reader_main_module.main() # Changed: Call main function from the module
 
         mock_get_devices.assert_called_once() # Ensure GetSwitchbotDevices was called
-        mock_get_switchbot_devices.get_tempsensors.assert_awaited_once()
+        mock_get_switchbot_devices.discover.assert_awaited_once()
         mock_write_api.write.assert_not_called() # No data should be written
         mock_logger.info.assert_any_call("Skipping device XX:XX:XX:XX:XX:XX as it does not match DEVICE_ID YY:YY:YY:YY:YY:YY")
 
@@ -216,7 +216,7 @@ async def test_device_id_filter_selects_correct_device(monkeypatch): # Added mon
     }
 
     mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.get_tempsensors.return_value = mock_sensor_data
+    mock_get_switchbot_devices.discover.return_value = mock_sensor_data
 
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()

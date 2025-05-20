@@ -37,6 +37,9 @@ async def main():
     logger.info("InfluxDB client initialized.")
 
     sensors = await GetSwitchbotDevices().discover(scan_timeout=60)
+    if not sensors:
+        logger.warning("No temperature sensors found. Exiting.")
+        return
     # logger.info(sensors)
     # logger.info(sensors['7688CA37-E4ED-E6F2-5D7A-B71CCE01D61D'])
     for address in sensors:

@@ -1,9 +1,9 @@
 [Unit]
 Description=Run switchbot-ble-to-influxdb script periodically
 # Specifies that the influxdb service is required to be active before this service starts.
-Requires=influxdb.service
+Requires=influxdb.service bluetooth.service
 # Specifies that this service should start after the influxdb service.
-After=influxdb.service
+After=influxdb.service bluetooth.service
 
 [Service]
 # Defines the service type as 'oneshot', meaning the service will exit after the command finishes.

@@ -1,4 +1,4 @@
-# systemd Setup for SwitchBot BLE to InfluxDB
+# Automatic Execution of SwitchBot BLE to InfluxDB with systemd
 
 This directory contains systemd unit files to run `switchbot-ble-to-influxdb` automatically every 10 minutes on Linux environments such as Raspberry Pi.
 
@@ -6,38 +6,43 @@ This directory contains systemd unit files to run `switchbot-ble-to-influxdb` au
 - `switchbot-ble-to-influxdb.service`: Service unit to run the application
 - `switchbot-ble-to-influxdb.timer`: Timer unit to trigger the service every 10 minutes
 
+## Prerequisites
+Run the following steps in the repository root and make sure the application works:
+```bash
+uv venv # Create virtual environment
+source .venv/bin/activate # Activate virtual environment
+uv sync # Install dependencies
+.venv/bin/python main.py
+```
+
 ## Setup Steps
 1. Edit the Service file to match your environment:
-   - Open `switchbot-ble-to-influxdb.service` and update the following fields:
-     - `User`: Set to the user that should run the service (e.g., `pi`)
-     - `WorkingDirectory`: Set to the directory where your app resides (e.g., `/home/pi/switchbot-ble-to-influxdb`)
-     - `ExecStart`: Set the full command to run your app (e.g., `/home/pi/switchbot-ble-to-influxdb/.venv/bin/python main.py`)
-   
-   **Example:**
-   ```ini
-   [Service]
-   Type=oneshot
-   User=pi
-   WorkingDirectory=/home/pi/switchbot-ble-to-influxdb
-   ExecStart=/home/pi/switchbot-ble-to-influxdb/.venv/bin/python main.py
-   ```
+    - `User`: The user to run the service (e.g., `pi`)
+    - `WorkingDirectory`: The app directory (e.g., `/home/pi/switchbot-ble-to-influxdb`)
+    - `ExecStart`: The command to run the app (e.g., `/home/pi/switchbot-ble-to-influxdb/.venv/bin/python main.py`)
 
-2. Copy the unit files to the systemd directory:
-   ```bash
-   sudo cp switchbot-ble-to-influxdb.service /etc/systemd/system/
-   sudo cp switchbot-ble-to-influxdb.timer /etc/systemd/system/
-   ```
+    **Example:**
+    ```ini
+    [Service]
+    Type=oneshot
+    User=pi
+    WorkingDirectory=/home/pi/switchbot-ble-to-influxdb
+    ExecStart=/home/pi/switchbot-ble-to-influxdb/.venv/bin/python main.py
+    ```
 
+2. Copy the unit files:
+    ```bash
+    sudo cp switchbot-ble-to-influxdb.service /etc/systemd/system/
+    sudo cp switchbot-ble-to-influxdb.timer /etc/systemd/system/
+    ```
 3. Reload systemd:
-   ```bash
-   sudo systemctl daemon-reload
-   ```
-
+    ```bash
+    sudo systemctl daemon-reload
+    ```
 4. Enable and start the timer:
-   ```bash
-   sudo systemctl enable --now switchbot-ble-to-influxdb.timer
-   ```
-
+    ```bash
+    sudo systemctl enable --now switchbot-ble-to-influxdb.timer
+    ```
 5. Check status:
     ```bash
     systemctl status switchbot-ble-to-influxdb.timer
@@ -58,13 +63,13 @@ This directory contains systemd unit files to run `switchbot-ble-to-influxdb` au
     # TriggeredBy: ● switchbot-ble-to-influxdb.timer
     ```
 
-    If it has never been executed, `-- No entries --` will be displayed.
+    Before the first timer execution, `-- No entries --` will be shown:
     ```bash
     journalctl -u switchbot-ble-to-influxdb.service
     # -- No entries --
     ```
 
-    Logs are displayed after the first execution.
+    After the first execution, logs will appear like this:
     ```bash
     journalctl -u switchbot-ble-to-influxdb.service
     # May 21 09:40:11 <hostname> systemd[1]: Starting switchbot-ble-to-influxdb.service - Run switchbot-ble-to-influxdb script periodically...

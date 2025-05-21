@@ -1,9 +1,9 @@
 [Unit]
 Description=Run switchbot-ble-to-influxdb script periodically
 # Specifies that the influxdb service is required to be active before this service starts.
-Requires=influxdb.service
+Requires=influxdb.service bluetooth.service
 # Specifies that this service should start after the influxdb service.
-After=influxdb.service
+After=influxdb.service bluetooth.service
 
 [Service]
 # Defines the service type as 'oneshot', meaning the service will exit after the command finishes.
@@ -11,9 +11,9 @@ Type=oneshot
 # Specifies the user under which the command will be executed. Replace <user_name> with your actual username.
 User=<user_name>
 # Sets the working directory for the executed command (equivalent to 'cd' in cron). Replace <user_name>.
-WorkingDirectory=/home/<user_name>/Documents/playground/switchbot-ble-to-influxdb
+WorkingDirectory=/home/<user_name>/switchbot-ble-to-influxdb
 # The command to be executed. Use the absolute path. Replace <user_name>.
-ExecStart=/home/<user_name>/.local/bin/uv run just dev
+ExecStart=/home/<user_name>/switchbot-ble-to-influxdb/.venv/bin/python main.py
 # Standard output and error will be directed to the systemd journal by default.
 # You can view them using 'journalctl --user -u switchbot-ble-to-influxdb.service'.
 #StandardOutput=journal

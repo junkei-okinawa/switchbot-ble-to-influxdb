@@ -78,12 +78,12 @@ uv sync # 依存関係のインストール
     # May 21 09:40:11 <hostname> uv[164698]: Installed 38 packages in 359ms
     # May 21 09:40:11 <hostname> uv[164711]: python main.py
     # May 21 09:40:17 <hostname> uv[164714]: 2025-05-21 09:44:17,841 - INFO - InfluxDB client initialized.
-    # May 21 09:41:17 <hostname> uv[164714]: 2025-05-21 09:45:17,890 - INFO - address: CA:5F:45:86:47:93
+    # May 21 09:41:17 <hostname> uv[164714]: 2025-05-21 09:45:17,890 - INFO - address: AA:BB:CC:DD:EE:FF
     # May 21 09:41:17 <hostname> uv[164714]: 2025-05-21 09:45:17,890 - INFO - Friendly name: Indoor/Outdoor Meter
     # May 21 09:41:17 <hostname> uv[164714]: 2025-05-21 09:45:17,891 - INFO - temperature: 29.5 °C
     # May 21 09:41:17 <hostname> uv[164714]: 2025-05-21 09:45:17,891 - INFO - humidity: 51 %
     # May 21 09:41:17 <hostname> uv[164714]: 2025-05-21 09:45:17,892 - INFO - battery: 90 %
-    # May 21 09:41:17 <hostname> uv[164714]: 2025-05-21 09:45:17,921 - INFO - Data written to InfluxDB for device CA:5F:45:86:47:93
+    # May 21 09:41:17 <hostname> uv[164714]: 2025-05-21 09:45:17,921 - INFO - Data written to InfluxDB for device AA:BB:CC:DD:EE:FF
     # May 21 09:41:18 <hostname> systemd[1]: switchbot-ble-to-influxdb.service: Deactivated successfully.
     # May 21 09:41:18 <hostname> systemd[1]: Finished switchbot-ble-to-influxdb.service - Run switchbot-ble-to-influxdb script periodically.
     # May 21 09:41:18 <hostname> systemd[1]: switchbot-ble-to-influxdb.service: Consumed 6.527s CPU time.

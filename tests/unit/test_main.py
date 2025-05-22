@@ -36,7 +36,7 @@ def mock_switchbot_devices():
 async def test_environment_variables_present(mock_env_vars, mock_switchbot_devices, caplog):
     """環境変数がすべて設定されている場合のテスト"""
     with patch('main.GetSwitchbotDevices') as MockGetSwitchbotDevices, \
-         patch('main.InfluxDBClient') as MockInfluxDBClient:
+         patch('main.InfluxDBClient'):
         MockGetSwitchbotDevices.return_value.discover = AsyncMock(return_value=mock_switchbot_devices)
         import main
         # 環境変数が正しく設定されていることをデバッグ

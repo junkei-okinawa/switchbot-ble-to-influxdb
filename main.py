@@ -25,11 +25,20 @@ async def discover_switchbot_devices(scan_timeout: int = SCAN_TIMEOUT_SECONDS) -
     delay_seconds = DISCOVERY_RETRY_BASE_DELAY_SECONDS
 
     for attempt in range(1, DISCOVERY_RETRY_COUNT + 1):
+        discoverer = GetSwitchbotDevices()
         try:
-            return await GetSwitchbotDevices().discover(scan_timeout=scan_timeout)
+            return await discoverer.discover(scan_timeout=scan_timeout)
         except BleakDBusError as exc:
             if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
                 raise
+
+            partial_adv_data = getattr(discoverer, "_adv_data", None)
+            if isinstance(partial_adv_data, dict) and partial_adv_data:
+                logger.warning(
+                    "Bluetooth discovery stopped with InProgress, but %s devices were already collected. Using partial results.",
+                    len(partial_adv_data),
+                )
+                return dict(partial_adv_data)
 
             if attempt == DISCOVERY_RETRY_COUNT:
                 logger.exception(

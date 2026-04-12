@@ -95,7 +95,7 @@ async def test_environment_variables_missing_measurement(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_discovery_retries_on_bleak_dbus_in_progress(monkeypatch):
+async def test_discovery_retries_on_bleak_dbus_in_progress():
     """Bluetooth discovery should retry once when BlueZ reports InProgress."""
     discovered_sensor = MagicMock()
     first_scanner = MagicMock()

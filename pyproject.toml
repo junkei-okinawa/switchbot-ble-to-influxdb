@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "influxdb-client>=1.48.0",
+    "bleak>=0.22.3",
     "pyswitchbot",
     "python-dotenv>=1.1.0",
 ]

@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 SCAN_TIMEOUT_SECONDS = 60
 DISCOVERY_RETRY_COUNT = 3
 DISCOVERY_RETRY_BASE_DELAY_SECONDS = 1.0
+BLUEZ_IN_PROGRESS_ERROR = "org.bluez.Error.InProgress"
 
 
 async def discover_switchbot_devices(scan_timeout: int = SCAN_TIMEOUT_SECONDS) -> dict:
@@ -27,7 +28,7 @@ async def discover_switchbot_devices(scan_timeout: int = SCAN_TIMEOUT_SECONDS) -
         try:
             return await GetSwitchbotDevices().discover(scan_timeout=scan_timeout)
         except BleakDBusError as exc:
-            if "InProgress" not in str(exc):
+            if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
                 raise
 
             if attempt == DISCOVERY_RETRY_COUNT:

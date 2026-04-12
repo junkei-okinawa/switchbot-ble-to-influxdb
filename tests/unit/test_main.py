@@ -120,4 +120,4 @@ async def test_discovery_retries_on_bleak_dbus_in_progress(monkeypatch):
     assert mock_get_devices.call_count == 2
     first_scanner.discover.assert_awaited_once_with(scan_timeout=1)
     second_scanner.discover.assert_awaited_once_with(scan_timeout=1)
-    mock_sleep.assert_awaited_once_with(1.0)
+    mock_sleep.assert_awaited_once_with(main.DISCOVERY_RETRY_BASE_DELAY_SECONDS)

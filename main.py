@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 
+from bleak.exc import BleakDBusError
 from switchbot.discovery import GetSwitchbotDevices
 
 from influxdb_client import InfluxDBClient, Point
@@ -12,6 +13,39 @@ from dotenv import load_dotenv
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+SCAN_TIMEOUT_SECONDS = 60
+DISCOVERY_RETRY_COUNT = 3
+DISCOVERY_RETRY_BASE_DELAY_SECONDS = 1.0
+BLUEZ_IN_PROGRESS_ERROR = "org.bluez.Error.InProgress"
+
+
+async def discover_switchbot_devices(scan_timeout: int = SCAN_TIMEOUT_SECONDS) -> dict:
+    """Discover SwitchBot devices, retrying transient BlueZ busy errors."""
+    delay_seconds = DISCOVERY_RETRY_BASE_DELAY_SECONDS
+
+    for attempt in range(1, DISCOVERY_RETRY_COUNT + 1):
+        try:
+            return await GetSwitchbotDevices().discover(scan_timeout=scan_timeout)
+        except BleakDBusError as exc:
+            if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
+                raise
+
+            if attempt == DISCOVERY_RETRY_COUNT:
+                logger.exception(
+                    "Bluetooth discovery failed after %s attempts because the adapter remained busy.",
+                    attempt,
+                )
+                raise
+
+            logger.warning(
+                "Bluetooth adapter is busy during discovery (%s/%s). Retrying in %.1f seconds.",
+                attempt,
+                DISCOVERY_RETRY_COUNT,
+                delay_seconds,
+            )
+            await asyncio.sleep(delay_seconds)
+            delay_seconds *= 2
 
 # --- Main Function ---
 async def main():
@@ -36,7 +70,7 @@ async def main():
     write_api = client.write_api(write_options=SYNCHRONOUS)
     logger.info("InfluxDB client initialized.")
 
-    sensors = await GetSwitchbotDevices().discover(scan_timeout=60)
+    sensors = await discover_switchbot_devices()
     if not sensors:
         logger.warning("No temperature sensors found. Exiting.")
         return

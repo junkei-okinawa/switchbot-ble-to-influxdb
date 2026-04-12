@@ -2,6 +2,7 @@ import os
 import sys
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
+from bleak.exc import BleakDBusError
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
@@ -92,3 +93,31 @@ async def test_environment_variables_missing_measurement(monkeypatch):
         await main.main()
     assert "Missing InfluxDB environment variables." in str(excinfo.value)
 
+
+@pytest.mark.asyncio
+async def test_discovery_retries_on_bleak_dbus_in_progress():
+    """Bluetooth discovery should retry once when BlueZ reports InProgress."""
+    discovered_sensor = MagicMock()
+    first_scanner = MagicMock()
+    first_scanner.discover = AsyncMock(
+        side_effect=BleakDBusError(
+            "org.bluez.Error.InProgress",
+            ["Operation already in progress"],
+        )
+    )
+    second_scanner = MagicMock()
+    second_scanner.discover = AsyncMock(return_value={"test_address": discovered_sensor})
+
+    with patch(
+        "main.GetSwitchbotDevices",
+        side_effect=[first_scanner, second_scanner],
+    ) as mock_get_devices, patch("main.asyncio.sleep", new=AsyncMock()) as mock_sleep:
+        import main
+
+        result = await main.discover_switchbot_devices(scan_timeout=1)
+
+    assert result == {"test_address": discovered_sensor}
+    assert mock_get_devices.call_count == 2
+    first_scanner.discover.assert_awaited_once_with(scan_timeout=1)
+    second_scanner.discover.assert_awaited_once_with(scan_timeout=1)
+    mock_sleep.assert_awaited_once_with(main.DISCOVERY_RETRY_BASE_DELAY_SECONDS)

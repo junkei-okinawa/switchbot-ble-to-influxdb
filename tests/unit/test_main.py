@@ -124,6 +124,30 @@ async def test_discovery_retries_on_bleak_dbus_in_progress():
 
 
 @pytest.mark.asyncio
+async def test_discovery_retries_when_constructor_raises_in_progress():
+    """Bluetooth discovery should retry when scanner construction itself is busy."""
+    discovered_sensor = MagicMock()
+    second_scanner = MagicMock()
+    second_scanner.discover = AsyncMock(return_value={"test_address": discovered_sensor})
+
+    with patch(
+        "main.GetSwitchbotDevices",
+        side_effect=[
+            BleakDBusError("org.bluez.Error.InProgress", ["Operation already in progress"]),
+            second_scanner,
+        ],
+    ) as mock_get_devices, patch("main.asyncio.sleep", new=AsyncMock()) as mock_sleep:
+        import main
+
+        result = await main.discover_switchbot_devices(scan_timeout=1)
+
+    assert result == {"test_address": discovered_sensor}
+    assert mock_get_devices.call_count == 2
+    second_scanner.discover.assert_awaited_once_with(scan_timeout=1)
+    mock_sleep.assert_awaited_once_with(main.DISCOVERY_RETRY_BASE_DELAY_SECONDS)
+
+
+@pytest.mark.asyncio
 async def test_discovery_returns_partial_results_on_in_progress():
     """Bluetooth discovery should keep collected devices when stop() fails with InProgress."""
     discovered_sensor = MagicMock()

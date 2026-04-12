@@ -20,25 +20,39 @@ DISCOVERY_RETRY_BASE_DELAY_SECONDS = 1.0
 BLUEZ_IN_PROGRESS_ERROR = "org.bluez.Error.InProgress"
 
 
+def _get_partial_discovery_results(discoverer: GetSwitchbotDevices) -> dict | None:
+    """Return collected scan results if the current switchbot version exposes them.
+
+    pyswitchbot currently stores in-progress scan data on the private `_adv_data`
+    attribute, so we isolate that compatibility dependency here.
+    """
+    partial_adv_data = getattr(discoverer, "_adv_data", None)
+    if isinstance(partial_adv_data, dict) and partial_adv_data:
+        return dict(partial_adv_data)
+    return None
+
+
 async def discover_switchbot_devices(scan_timeout: int = SCAN_TIMEOUT_SECONDS) -> dict:
     """Discover SwitchBot devices, retrying transient BlueZ busy errors."""
     delay_seconds = DISCOVERY_RETRY_BASE_DELAY_SECONDS
 
     for attempt in range(1, DISCOVERY_RETRY_COUNT + 1):
-        discoverer = GetSwitchbotDevices()
+        discoverer = None
         try:
+            discoverer = GetSwitchbotDevices()
             return await discoverer.discover(scan_timeout=scan_timeout)
         except BleakDBusError as exc:
             if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
                 raise
 
-            partial_adv_data = getattr(discoverer, "_adv_data", None)
-            if isinstance(partial_adv_data, dict) and partial_adv_data:
+            if discoverer is not None and (
+                partial_results := _get_partial_discovery_results(discoverer)
+            ):
                 logger.warning(
                     "Bluetooth discovery stopped with InProgress, but %s devices were already collected. Using partial results.",
-                    len(partial_adv_data),
+                    len(partial_results),
                 )
-                return dict(partial_adv_data)
+                return partial_results
 
             if attempt == DISCOVERY_RETRY_COUNT:
                 logger.exception(

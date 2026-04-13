@@ -122,4 +122,4 @@ If BlueZ occasionally gets stuck in a busy state, you can refresh it once per ni
     journalctl -u nightly-bluetooth-restart.service
     ```
 
-The default schedule is `03:00` every day. Adjust `OnCalendar` in the timer file if you want a different maintenance window.
+The default schedule is `03:00` every day. Adjust `OnCalendar` in the timer file if you want a different maintenance window. The timer is intentionally non-persistent, so it will not backfill missed restarts after downtime.

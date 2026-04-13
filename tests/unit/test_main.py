@@ -1,5 +1,6 @@
 import os
 import sys
+import asyncio
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from bleak.exc import BleakDBusError
@@ -149,3 +150,44 @@ async def test_discovery_returns_partial_results_when_stop_is_busy():
     assert mock_sleep.await_count == 3
     # stop() is retried three times inside the single scan attempt
     # and no outer retry is needed because partial data is returned.
+
+
+@pytest.mark.asyncio
+async def test_create_scanner_uses_configured_adapter(monkeypatch):
+    """Scanner creation should respect an explicit adapter override."""
+    monkeypatch.setenv("BLEAK_ADAPTER", "hci1")
+    discovered_devices = {}
+
+    with patch("main.BleakScanner") as mock_scanner:
+        import main
+
+        main._create_scanner(discovered_devices)
+
+    mock_scanner.assert_called_once()
+    _, kwargs = mock_scanner.call_args
+    assert kwargs["adapter"] == "hci1"
+
+
+@pytest.mark.asyncio
+async def test_scan_attempt_cleans_up_scanner_when_sleep_is_cancelled():
+    """The scanner should still be stopped if the scan coroutine is cancelled."""
+    stop_called = AsyncMock()
+
+    class FakeScanner:
+        def __init__(self, detection_callback):
+            self.detection_callback = detection_callback
+            self.start = AsyncMock(return_value=None)
+            self.stop = stop_called
+
+    with patch(
+        "main.BleakScanner",
+        side_effect=lambda **kwargs: FakeScanner(kwargs["detection_callback"]),
+    ), patch("main.parse_advertisement_data", return_value=None), patch(
+        "main.asyncio.sleep", new=AsyncMock(side_effect=asyncio.CancelledError())
+    ):
+        import main
+
+        with pytest.raises(asyncio.CancelledError):
+            await main._scan_switchbot_devices_once(scan_timeout=1)
+
+    assert stop_called.await_count == 1

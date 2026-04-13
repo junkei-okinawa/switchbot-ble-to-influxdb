@@ -21,7 +21,7 @@ SCAN_TIMEOUT_SECONDS = 60
 DISCOVERY_RETRY_COUNT = 3
 DISCOVERY_RETRY_BASE_DELAY_SECONDS = 1.0
 BLUEZ_IN_PROGRESS_ERROR = "org.bluez.Error.InProgress"
-BLUEZ_ADAPTER = "hci0"
+BLEAK_ADAPTER_ENV = "BLEAK_ADAPTER"
 
 
 def _build_detection_callback(discovered_devices: dict) -> Callable[[object, object], None]:
@@ -59,31 +59,41 @@ async def _stop_scanner_with_retry(scanner: BleakScanner) -> None:
             delay_seconds *= 2
 
 
+def _create_scanner(discovered_devices: dict) -> BleakScanner:
+    """Create a scanner, optionally using the configured adapter."""
+    scanner_kwargs: dict = {
+        "detection_callback": _build_detection_callback(discovered_devices),
+    }
+    if adapter := os.getenv(BLEAK_ADAPTER_ENV):
+        scanner_kwargs["adapter"] = adapter
+
+    return BleakScanner(**scanner_kwargs)
+
+
 async def _scan_switchbot_devices_once(scan_timeout: int) -> dict:
     """Run one Bluetooth scan and return the collected advertisements."""
     discovered_devices: dict = {}
-    scanner = BleakScanner(
-        detection_callback=_build_detection_callback(discovered_devices),
-        adapter=BLUEZ_ADAPTER,
-    )
+    scanner = _create_scanner(discovered_devices)
 
     async with CONNECT_LOCK:
         await scanner.start()
-        await asyncio.sleep(scan_timeout)
         try:
-            await _stop_scanner_with_retry(scanner)
-        except BleakDBusError as exc:
-            if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
+            await asyncio.sleep(scan_timeout)
+        finally:
+            try:
+                await asyncio.shield(_stop_scanner_with_retry(scanner))
+            except BleakDBusError as exc:
+                if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
+                    raise
+
+                if discovered_devices:
+                    logger.warning(
+                        "Bluetooth discovery stopped with InProgress, but %s devices were already collected. Using partial results.",
+                        len(discovered_devices),
+                    )
+                    return discovered_devices
+
                 raise
-
-            if discovered_devices:
-                logger.warning(
-                    "Bluetooth discovery stopped with InProgress, but %s devices were already collected. Using partial results.",
-                    len(discovered_devices),
-                )
-                return discovered_devices
-
-            raise
 
     return discovered_devices
 

@@ -42,16 +42,12 @@ async def test_successful_data_fetch_and_write(monkeypatch): # Added monkeypatch
         )
     }
 
-    # Mock GetSwitchbotDevices and its discover method
-    mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.discover.return_value = mock_sensor_data
-
     # Mock InfluxDBClient and its methods
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()
     mock_influx_client_instance.write_api.return_value = mock_write_api
 
-    with patch('main.GetSwitchbotDevices', return_value=mock_get_switchbot_devices) as mock_switchbot, \
+    with patch('main._scan_switchbot_devices_once', new=AsyncMock(return_value=mock_sensor_data)) as mock_scan_once, \
         patch('main.InfluxDBClient', return_value=mock_influx_client_instance), \
         patch('main.logger') as mock_logger:  # Optional: mock logger to check logs
 
@@ -59,8 +55,7 @@ async def test_successful_data_fetch_and_write(monkeypatch): # Added monkeypatch
         await reader_main_module.main()  # Changed: Call main function from the module
 
         # Assertions
-        mock_switchbot.assert_called_once()
-        mock_get_switchbot_devices.discover.assert_awaited_once()
+        mock_scan_once.assert_awaited_once()
 
         # Check if write_api.write was called with the correct data
         # This requires inspecting the 'record' argument of the call
@@ -86,23 +81,18 @@ async def test_switchbot_device_not_found(monkeypatch): # Added monkeypatch here
     """
     Tests the scenario where the specified SwitchBot device is not found.
     """
-    # Mock GetSwitchbotDevices to return no sensors or an empty dict
-    mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.discover.return_value = {} # No sensors found
-
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()
     mock_influx_client_instance.write_api.return_value = mock_write_api
 
-    with patch('main.GetSwitchbotDevices', return_value=mock_get_switchbot_devices) as mock_switchbot, \
+    with patch('main._scan_switchbot_devices_once', new=AsyncMock(return_value={} )) as mock_scan_once, \
         patch('main.InfluxDBClient', return_value=mock_influx_client_instance), \
         patch('main.logger') as mock_logger:
 
         import main as reader_main_module
         await reader_main_module.main()  # Changed: Call main function from the module
 
-        mock_switchbot.assert_called_once()
-        mock_get_switchbot_devices.discover.assert_awaited_once()
+        mock_scan_once.assert_awaited_once()
         # Client is still initialized
 
         # Ensure write was not called as no device data should be processed
@@ -132,24 +122,20 @@ async def test_influxdb_write_failure(monkeypatch): # Added monkeypatch here
         )
     }
 
-    mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.discover.return_value = mock_sensor_data
-
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()
     # Simulate an exception during write
     mock_write_api.write.side_effect = Exception("InfluxDB write error")
     mock_influx_client_instance.write_api.return_value = mock_write_api
 
-    with patch('main.GetSwitchbotDevices', return_value=mock_get_switchbot_devices) as mock_switchbot, \
+    with patch('main._scan_switchbot_devices_once', new=AsyncMock(return_value=mock_sensor_data)) as mock_scan_once, \
         patch('main.InfluxDBClient', return_value=mock_influx_client_instance), \
         patch('main.logger') as mock_logger:
 
         import main as reader_main_module
         await reader_main_module.main()  # Changed: Call main function from the module
 
-        mock_switchbot.assert_called_once()
-        mock_get_switchbot_devices.discover.assert_awaited_once()
+        mock_scan_once.assert_awaited_once()
         mock_write_api.write.assert_called_once() # Write was attempted
 
         # Check for the error log
@@ -171,22 +157,18 @@ async def test_specific_device_id_not_in_scan_results(monkeypatch): # Added monk
         )
     }
 
-    mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.discover.return_value = mock_sensor_data
-
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()
     mock_influx_client_instance.write_api.return_value = mock_write_api
 
-    with patch('main.GetSwitchbotDevices', return_value=mock_get_switchbot_devices) as mock_get_devices, \
+    with patch('main._scan_switchbot_devices_once', new=AsyncMock(return_value=mock_sensor_data)) as mock_scan_once, \
         patch('main.InfluxDBClient', return_value=mock_influx_client_instance), \
         patch('main.logger') as mock_logger:
 
         import main as reader_main_module
         await reader_main_module.main()  # Changed: Call main function from the module
 
-        mock_get_devices.assert_called_once() # Ensure GetSwitchbotDevices was called
-        mock_get_switchbot_devices.discover.assert_awaited_once()
+        mock_scan_once.assert_awaited_once()
         mock_write_api.write.assert_not_called() # No data should be written
         mock_logger.info.assert_any_call("Skipping device XX:XX:XX:XX:XX:XX as it does not match DEVICE_ID YY:YY:YY:YY:YY:YY")
 
@@ -211,21 +193,18 @@ async def test_device_id_filter_selects_correct_device(monkeypatch): # Added mon
         ),
     }
 
-    mock_get_switchbot_devices = AsyncMock()
-    mock_get_switchbot_devices.discover.return_value = mock_sensor_data
-
     mock_influx_client_instance = MagicMock()
     mock_write_api = MagicMock()
     mock_influx_client_instance.write_api.return_value = mock_write_api
 
-    with patch('main.GetSwitchbotDevices', return_value=mock_get_switchbot_devices) as mock_get_devices, \
+    with patch('main._scan_switchbot_devices_once', new=AsyncMock(return_value=mock_sensor_data)) as mock_scan_once, \
         patch('main.InfluxDBClient', return_value=mock_influx_client_instance), \
         patch('main.logger') as mock_logger:
 
         import main as reader_main_module
         await reader_main_module.main()  # Changed: Call main function from the module
 
-        mock_get_devices.assert_called_once() # Ensure GetSwitchbotDevices was called
+        mock_scan_once.assert_awaited_once()
         mock_write_api.write.assert_called_once() # Should be called exactly once for the target device
         args, kwargs = mock_write_api.write.call_args
         point = kwargs['record']
@@ -235,4 +214,3 @@ async def test_device_id_filter_selects_correct_device(monkeypatch): # Added mon
         mock_logger.info.assert_any_call("Skipping device XX:XX:XX:XX:XX:XX as it does not match DEVICE_ID TARGET_DEVICE_ADDR")
         mock_logger.info.assert_any_call("Skipping device ZZ:ZZ:ZZ:ZZ:ZZ:ZZ as it does not match DEVICE_ID TARGET_DEVICE_ADDR")
         mock_logger.info.assert_any_call("Data written to InfluxDB for device TARGET_DEVICE_ADDR")
-

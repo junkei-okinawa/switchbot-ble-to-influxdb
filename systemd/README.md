@@ -93,3 +93,33 @@ uv sync # Install dependencies
 - The service runs once every 10 minutes (intermittent operation).
 - Be sure to update the user and paths in the service file to match your environment.
 - Service logs can be checked with `journalctl`.
+
+## Nightly Bluetooth Restart
+
+If BlueZ occasionally gets stuck in a busy state, you can refresh it once per night during a low-traffic window.
+
+### Files
+- `nightly-bluetooth-restart.service`: Service unit that restarts `bluetooth.service`
+- `nightly-bluetooth-restart.timer`: Timer unit that runs the restart service once per day
+
+### Setup Steps
+1. Copy the unit files:
+    ```bash
+    sudo cp nightly-bluetooth-restart.service /etc/systemd/system/
+    sudo cp nightly-bluetooth-restart.timer /etc/systemd/system/
+    ```
+2. Reload systemd:
+    ```bash
+    sudo systemctl daemon-reload
+    ```
+3. Enable and start the timer:
+    ```bash
+    sudo systemctl enable --now nightly-bluetooth-restart.timer
+    ```
+4. Check status:
+    ```bash
+    systemctl status nightly-bluetooth-restart.timer
+    journalctl -u nightly-bluetooth-restart.service
+    ```
+
+The default schedule is `03:00` every day. Adjust `OnCalendar` in the timer file if you want a different maintenance window.

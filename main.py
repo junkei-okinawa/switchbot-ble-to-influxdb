@@ -1,9 +1,12 @@
 import os
 import asyncio
 import logging
+from collections.abc import Callable
 
+from bleak import BleakScanner
 from bleak.exc import BleakDBusError
-from switchbot.discovery import GetSwitchbotDevices
+from switchbot.adv_parser import parse_advertisement_data
+from switchbot.discovery import CONNECT_LOCK
 
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -18,18 +21,71 @@ SCAN_TIMEOUT_SECONDS = 60
 DISCOVERY_RETRY_COUNT = 3
 DISCOVERY_RETRY_BASE_DELAY_SECONDS = 1.0
 BLUEZ_IN_PROGRESS_ERROR = "org.bluez.Error.InProgress"
+BLUEZ_ADAPTER = "hci0"
 
 
-def _get_partial_discovery_results(discoverer: GetSwitchbotDevices) -> dict | None:
-    """Return collected scan results if the current switchbot version exposes them.
+def _build_detection_callback(discovered_devices: dict) -> Callable[[object, object], None]:
+    """Build a callback that accumulates SwitchBot advertisements."""
+    def detection_callback(device, advertisement_data) -> None:
+        discovery = parse_advertisement_data(device, advertisement_data)
+        if discovery:
+            discovered_devices[discovery.address] = discovery
 
-    pyswitchbot currently stores in-progress scan data on the private `_adv_data`
-    attribute, so we isolate that compatibility dependency here.
-    """
-    partial_adv_data = getattr(discoverer, "_adv_data", None)
-    if isinstance(partial_adv_data, dict) and partial_adv_data:
-        return dict(partial_adv_data)
-    return None
+    return detection_callback
+
+
+async def _stop_scanner_with_retry(scanner: BleakScanner) -> None:
+    """Stop the scanner, retrying if BlueZ reports the adapter is busy."""
+    delay_seconds = DISCOVERY_RETRY_BASE_DELAY_SECONDS
+
+    for attempt in range(1, DISCOVERY_RETRY_COUNT + 1):
+        try:
+            await scanner.stop()
+            return
+        except BleakDBusError as exc:
+            if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
+                raise
+
+            if attempt == DISCOVERY_RETRY_COUNT:
+                raise
+
+            logger.warning(
+                "Bluetooth adapter is busy while stopping discovery (%s/%s). Retrying in %.1f seconds.",
+                attempt,
+                DISCOVERY_RETRY_COUNT,
+                delay_seconds,
+            )
+            await asyncio.sleep(delay_seconds)
+            delay_seconds *= 2
+
+
+async def _scan_switchbot_devices_once(scan_timeout: int) -> dict:
+    """Run one Bluetooth scan and return the collected advertisements."""
+    discovered_devices: dict = {}
+    scanner = BleakScanner(
+        detection_callback=_build_detection_callback(discovered_devices),
+        adapter=BLUEZ_ADAPTER,
+    )
+
+    async with CONNECT_LOCK:
+        await scanner.start()
+        await asyncio.sleep(scan_timeout)
+        try:
+            await _stop_scanner_with_retry(scanner)
+        except BleakDBusError as exc:
+            if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
+                raise
+
+            if discovered_devices:
+                logger.warning(
+                    "Bluetooth discovery stopped with InProgress, but %s devices were already collected. Using partial results.",
+                    len(discovered_devices),
+                )
+                return discovered_devices
+
+            raise
+
+    return discovered_devices
 
 
 async def discover_switchbot_devices(scan_timeout: int = SCAN_TIMEOUT_SECONDS) -> dict:
@@ -37,22 +93,11 @@ async def discover_switchbot_devices(scan_timeout: int = SCAN_TIMEOUT_SECONDS) -
     delay_seconds = DISCOVERY_RETRY_BASE_DELAY_SECONDS
 
     for attempt in range(1, DISCOVERY_RETRY_COUNT + 1):
-        discoverer = None
         try:
-            discoverer = GetSwitchbotDevices()
-            return await discoverer.discover(scan_timeout=scan_timeout)
+            return await _scan_switchbot_devices_once(scan_timeout)
         except BleakDBusError as exc:
             if getattr(exc, "dbus_error", None) != BLUEZ_IN_PROGRESS_ERROR:
                 raise
-
-            if discoverer is not None and (
-                partial_results := _get_partial_discovery_results(discoverer)
-            ):
-                logger.warning(
-                    "Bluetooth discovery stopped with InProgress, but %s devices were already collected. Using partial results.",
-                    len(partial_results),
-                )
-                return partial_results
 
             if attempt == DISCOVERY_RETRY_COUNT:
                 logger.exception(

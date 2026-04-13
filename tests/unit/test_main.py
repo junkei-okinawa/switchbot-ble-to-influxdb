@@ -36,9 +36,8 @@ def mock_switchbot_devices():
 @pytest.mark.asyncio
 async def test_environment_variables_present(mock_env_vars, mock_switchbot_devices, caplog):
     """環境変数がすべて設定されている場合のテスト"""
-    with patch('main.GetSwitchbotDevices') as MockGetSwitchbotDevices, \
+    with patch('main._scan_switchbot_devices_once', new=AsyncMock(return_value=mock_switchbot_devices)), \
          patch('main.InfluxDBClient'):
-        MockGetSwitchbotDevices.return_value.discover = AsyncMock(return_value=mock_switchbot_devices)
         import main
         # 環境変数が正しく設定されていることをデバッグ
         print("Environment Variables:")
@@ -96,77 +95,57 @@ async def test_environment_variables_missing_measurement(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_discovery_retries_on_bleak_dbus_in_progress():
-    """Bluetooth discovery should retry once when BlueZ reports InProgress."""
+    """Bluetooth discovery should retry the whole scan when the attempt is busy."""
     discovered_sensor = MagicMock()
-    first_scanner = MagicMock()
-    first_scanner.discover = AsyncMock(
-        side_effect=BleakDBusError(
-            "org.bluez.Error.InProgress",
-            ["Operation already in progress"],
-        )
-    )
-    second_scanner = MagicMock()
-    second_scanner.discover = AsyncMock(return_value={"test_address": discovered_sensor})
 
     with patch(
-        "main.GetSwitchbotDevices",
-        side_effect=[first_scanner, second_scanner],
-    ) as mock_get_devices, patch("main.asyncio.sleep", new=AsyncMock()) as mock_sleep:
-        import main
-
-        result = await main.discover_switchbot_devices(scan_timeout=1)
-
-    assert result == {"test_address": discovered_sensor}
-    assert mock_get_devices.call_count == 2
-    first_scanner.discover.assert_awaited_once_with(scan_timeout=1)
-    second_scanner.discover.assert_awaited_once_with(scan_timeout=1)
-    mock_sleep.assert_awaited_once_with(main.DISCOVERY_RETRY_BASE_DELAY_SECONDS)
-
-
-@pytest.mark.asyncio
-async def test_discovery_retries_when_constructor_raises_in_progress():
-    """Bluetooth discovery should retry when scanner construction itself is busy."""
-    discovered_sensor = MagicMock()
-    second_scanner = MagicMock()
-    second_scanner.discover = AsyncMock(return_value={"test_address": discovered_sensor})
-
-    with patch(
-        "main.GetSwitchbotDevices",
+        "main._scan_switchbot_devices_once",
         side_effect=[
             BleakDBusError("org.bluez.Error.InProgress", ["Operation already in progress"]),
-            second_scanner,
+            {"test_address": discovered_sensor},
         ],
-    ) as mock_get_devices, patch("main.asyncio.sleep", new=AsyncMock()) as mock_sleep:
+    ) as mock_scan_once, patch("main.asyncio.sleep", new=AsyncMock()) as mock_sleep:
         import main
 
         result = await main.discover_switchbot_devices(scan_timeout=1)
 
     assert result == {"test_address": discovered_sensor}
-    assert mock_get_devices.call_count == 2
-    second_scanner.discover.assert_awaited_once_with(scan_timeout=1)
+    assert mock_scan_once.call_count == 2
     mock_sleep.assert_awaited_once_with(main.DISCOVERY_RETRY_BASE_DELAY_SECONDS)
 
 
 @pytest.mark.asyncio
-async def test_discovery_returns_partial_results_on_in_progress():
-    """Bluetooth discovery should keep collected devices when stop() fails with InProgress."""
+async def test_discovery_returns_partial_results_when_stop_is_busy():
+    """Bluetooth discovery should return collected devices if stop() keeps failing."""
     discovered_sensor = MagicMock()
-    discoverer = MagicMock()
-    discoverer._adv_data = {"test_address": discovered_sensor}
-    discoverer.discover = AsyncMock(
-        side_effect=BleakDBusError(
-            "org.bluez.Error.InProgress",
-            ["Operation already in progress"],
-        )
-    )
+    discovered_sensor.address = "test_address"
 
-    with patch("main.GetSwitchbotDevices", return_value=discoverer) as mock_get_devices, \
+    class FakeScanner:
+        def __init__(self, detection_callback):
+            self.detection_callback = detection_callback
+            self.start = AsyncMock(side_effect=self._start)
+            self.stop = AsyncMock(
+                side_effect=[
+                    BleakDBusError("org.bluez.Error.InProgress", ["Operation already in progress"]),
+                    BleakDBusError("org.bluez.Error.InProgress", ["Operation already in progress"]),
+                    BleakDBusError("org.bluez.Error.InProgress", ["Operation already in progress"]),
+                ]
+            )
+
+        async def _start(self):
+            device = MagicMock()
+            device.address = "test_address"
+            self.detection_callback(device, MagicMock())
+
+    with patch("main.BleakScanner", side_effect=lambda **kwargs: FakeScanner(kwargs["detection_callback"])), \
+        patch("main.parse_advertisement_data", return_value=discovered_sensor), \
         patch("main.asyncio.sleep", new=AsyncMock()) as mock_sleep:
         import main
 
-        result = await main.discover_switchbot_devices(scan_timeout=1)
+        result = await main._scan_switchbot_devices_once(scan_timeout=1)
 
     assert result == {"test_address": discovered_sensor}
-    mock_get_devices.assert_called_once()
-    discoverer.discover.assert_awaited_once_with(scan_timeout=1)
-    mock_sleep.assert_not_called()
+    mock_sleep.assert_any_await(1)
+    assert mock_sleep.await_count == 3
+    # stop() is retried three times inside the single scan attempt
+    # and no outer retry is needed because partial data is returned.

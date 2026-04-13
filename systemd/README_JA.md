@@ -93,3 +93,33 @@ uv sync # 依存関係のインストール
 - サービスは10分ごとに1回だけ実行されます（間欠動作）。
 - サービスの実行ユーザーやパスは環境に合わせて必ず修正してください。
 - サービスのログは`journalctl`で確認できます。
+
+## 夜間のBluetooth再起動
+
+BlueZがたまにbusy状態で詰まる場合、夜間の低トラフィック時間に1日1回だけBluetoothサービスを再起動すると安定化に役立つことがあります。
+
+### ファイル
+- `nightly-bluetooth-restart.service`: `bluetooth.service` を再起動するService Unit
+- `nightly-bluetooth-restart.timer`: 1日1回再起動を実行するTimer Unit
+
+### 設定手順
+1. ユニットファイルの配置
+    ```bash
+    sudo cp nightly-bluetooth-restart.service /etc/systemd/system/
+    sudo cp nightly-bluetooth-restart.timer /etc/systemd/system/
+    ```
+2. systemdにリロードを通知
+    ```bash
+    sudo systemctl daemon-reload
+    ```
+3. タイマーの有効化と起動
+    ```bash
+    sudo systemctl enable --now nightly-bluetooth-restart.timer
+    ```
+4. 状態確認
+    ```bash
+    systemctl status nightly-bluetooth-restart.timer
+    journalctl -u nightly-bluetooth-restart.service
+    ```
+
+デフォルトでは毎日 `03:00` に実行します。`OnCalendar` を変更すれば、メンテナンス時間を調整できます。このタイマーはメンテナンス用途なので `Persistent=false` とし、停止中に実行を取りこぼしても起動直後にまとめて実行しないようにしています。

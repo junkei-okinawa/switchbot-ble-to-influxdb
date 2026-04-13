@@ -1,0 +1,12 @@
+[Unit]
+Description=Restart Bluetooth service every night
+
+[Timer]
+# Run once every day at 03:00 to refresh BlueZ during a low-traffic window.
+OnCalendar=*-*-* 03:00:00
+# Do not backfill missed runs after downtime; this is a maintenance task.
+Persistent=false
+Unit=nightly-bluetooth-restart.service
+
+[Install]
+WantedBy=timers.target

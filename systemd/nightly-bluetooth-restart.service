@@ -1,0 +1,7 @@
+[Unit]
+Description=Restart Bluetooth service nightly
+Documentation=man:systemctl(1)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart bluetooth.service
